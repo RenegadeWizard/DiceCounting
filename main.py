@@ -20,6 +20,7 @@ def main():
     resized = imutils.resize(image, width=300)
     ratio = image.shape[0] / float(resized.shape[0])
 
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
 
     edges = feature.canny(gray, sigma=5)
