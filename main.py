@@ -1,11 +1,17 @@
-from skimage import feature
+import scipy.ndimage as ndi
+from skimage import io, transform, img_as_float, filters, restoration, morphology, feature
 import skimage.morphology as mp
+from skimage.color import rgb2hed, rgb2gray
+from skimage.exposure import exposure
 import numpy as np
+import scipy.ndimage
+from matplotlib import pyplot as plt
 from PIL import Image
+from skimage.measure import regionprops
 import cv2
 import imutils
 
-selem = mp.selem.disk(2)
+selem = mp.selem.disk(1)
 
 
 def to_uint8(arr):
@@ -16,14 +22,25 @@ def to_uint8(arr):
 
 
 def main():
-    image = cv2.imread('photos/dice4.jpg')
+    image = cv2.imread('photos/dice10.jpg')
     resized = imutils.resize(image, width=300)
     ratio = image.shape[0] / float(resized.shape[0])
 
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
 
-    edges = feature.canny(gray, sigma=5)
+    # test = filters.prewitt(gray)
+    denoised = restoration.denoise_nl_means(gray, h=0.95)
+    threshold = filters.threshold_minimum(denoised)
+    thres = denoised > threshold
+
+
+    # ihc_hed = rgb2hed(image)
+
+    # h = exposure.rescale_intensity(ihc_hed[:, :, 0], out_range=(0, 1))
+    # d = exposure.rescale_intensity(ihc_hed[:, :, 2], out_range=(0, 1))
+    # zdh = np.dstack((np.zeros_like(h), d, h))
+    edges = feature.canny(thres, sigma=3)
     edges = mp.binary_dilation(edges, selem=selem)
     edges = to_uint8(edges)
 
@@ -40,8 +57,9 @@ def main():
         c = c.astype("float")
         c *= ratio
         c = c.astype("int")
-        cv2.drawContours(image, [c], -1, (0, 255, 0), 2)
+        cv2.drawContours(image, [c], -1, (0, 255, 0), 5)
         if h[-1] == -1:
+
             # Compute the centroids of the dies' outer contours
             cX = int((M["m10"] / M["m00"]) * ratio)
             cY = int((M["m01"] / M["m00"]) * ratio)
@@ -52,6 +70,13 @@ def main():
 
     # cv2.drawContours(resized, cnt, -1, (0, 255, 0), 1)
     # image = imutils.resize(resized, width=800)
+    cnt = 0
+    for i in hierarchy[0]:
+        if i[0] == -1 and i[1] == -1 and i[2] == -1:
+            cnt += 1
+
+    print(cnt)
+
     img = Image.fromarray(image)
     img.show()
 
