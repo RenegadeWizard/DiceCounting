@@ -1,13 +1,7 @@
-import scipy.ndimage as ndi
-from skimage import io, transform, img_as_float, filters, restoration, morphology, feature
+from skimage import feature
 import skimage.morphology as mp
-from skimage.color import rgb2hed, rgb2gray
-from skimage.exposure import exposure
 import numpy as np
-import scipy.ndimage
-from matplotlib import pyplot as plt
 from PIL import Image
-from skimage.measure import regionprops
 import cv2
 import imutils
 
@@ -22,29 +16,42 @@ def to_uint8(arr):
 
 
 def main():
-    # image = io.imread('photos/dice4.jpg')
     image = cv2.imread('photos/dice4.jpg')
-    rimage = imutils.resize(image, width=800)
     resized = imutils.resize(image, width=300)
     ratio = image.shape[0] / float(resized.shape[0])
 
-
     gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
-
 
     edges = feature.canny(gray, sigma=5)
     edges = mp.binary_dilation(edges, selem=selem)
     edges = to_uint8(edges)
 
-    redges = imutils.resize(edges, width=800)
-
-
     # blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     # thresh = cv2.threshold(blurred, 60, 255, cv2.THRESH_BINARY)[1]
-    cnt, hr = cv2.findContours(redges.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(edges.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    cv2.drawContours(rimage, cnt, -1, (0,255,0), 2)
-    img = Image.fromarray(rimage)
+    # Loop over the contours
+    for c, h in zip(contours, hierarchy[0]):
+        # Compute moments of the contours
+        M = cv2.moments(c)
+        cX = 0
+        cY = 0
+        c = c.astype("float")
+        c *= ratio
+        c = c.astype("int")
+        cv2.drawContours(image, [c], -1, (0, 255, 0), 2)
+        if h[-1] == -1:
+            # Compute the centroids of the dies' outer contours
+            cX = int((M["m10"] / M["m00"]) * ratio)
+            cY = int((M["m01"] / M["m00"]) * ratio)
+            # Move the Y coordinate to the bottom of a die
+            cY += int(ratio*(np.sqrt(M["m00"])*np.sqrt(2))/2)
+            cv2.putText(image, "Kostka", (cX, cY), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5, (255, 255, 255), 2)
+
+    # cv2.drawContours(resized, cnt, -1, (0, 255, 0), 1)
+    # image = imutils.resize(resized, width=800)
+    img = Image.fromarray(image)
     img.show()
 
     # height, width = int(500 / image.shape[1] * image.shape[0]), 500
